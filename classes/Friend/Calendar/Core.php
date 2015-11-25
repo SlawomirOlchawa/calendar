@@ -29,11 +29,6 @@ class Friend_Calendar_Core extends Friend_Abstract_Entity
     protected $_month = null;
 
     /**
-     * @var int
-     */
-    protected $_year = 0;
-
-    /**
      * @param Controller_Entity $controller
      * @param Model_Abstract_Event $events
      * @param string $action
@@ -63,16 +58,17 @@ class Friend_Calendar_Core extends Friend_Abstract_Entity
 
         $currentMonth = Month::getCurrent()->getUrlName();
         $currentYear = (int) date('Y');
+        $year = null;
 
         $params = explode('-', $this->_controller->request->param('params'));
 
         if (!empty($params))
         {
             $this->_month = array_shift($params);
-            $this->_year = (int) array_shift($params);
+            $year = (int) array_shift($params);
         }
 
-        if ($this->_month === $currentMonth AND $this->_year === $currentYear)
+        if ($this->_month === $currentMonth AND $year === $currentYear)
         {
             $url = URL::site($this->_action);
 
@@ -84,22 +80,22 @@ class Friend_Calendar_Core extends Friend_Abstract_Entity
             $this->_controller->redirect($url, 301);
         }
 
-        if (empty($this->_month) AND empty($this->_year))
+        if (empty($this->_month) AND empty($year))
         {
             $this->_month = $currentMonth;
-            $this->_year = $currentYear;
+            $year = $currentYear;
         }
 
-        if (($this->_year < 2015) OR ($this->_year > date('Y')+2)
+        if (($year < 2015) OR ($year > date('Y')+2)
             OR (!Month::isValidUrlName($this->_month)))
         {
             throw new HTTP_Exception_404('Nie znaleziono strony o podanym adresie');
         }
 
-        $this->_month = Month::createFromUrlName($this->_month);
-        $date = $this->_year.'-'.$this->_month->getNumericName();
+        $this->_month = Month::createFromUrlName($this->_month, $year);
+        $date = $year.'-'.$this->_month->getNumericName();
 
-        $this->_events->olderThan($date.'-01')->newerThan($date.'-31')->orderByDate();
+        $this->_events->newerOrEqualThan($date.'-01')->olderOrEqualThan($date.'-31')->orderByDate();
 
         if (!empty($this->_entity))
         {
@@ -107,7 +103,7 @@ class Friend_Calendar_Core extends Friend_Abstract_Entity
         }
 
         Helper_Meta::addTitle($this->_caption);
-        Helper_Meta::addTitle($this->_month->getFullName().' '.$this->_year);
+        Helper_Meta::addTitle($this->_month->getFullName().' '.$year);
     }
 
     /**
@@ -115,7 +111,7 @@ class Friend_Calendar_Core extends Friend_Abstract_Entity
      */
     public function getUrlName()
     {
-        return $this->_month->getUrlName().'-'.$this->_year;
+        return $this->_month->getUrlName().'-'.$this->_month->getYear();
     }
 
     /**
@@ -127,14 +123,16 @@ class Friend_Calendar_Core extends Friend_Abstract_Entity
         {
             Helper_Locator::add($this->_entity->name, $this->_entity->getURL());
         }
+        else
+        {
+            Helper_Locator::add($this->_caption, URL::site($this->_action));
+        }
 
-        Helper_Locator::add($this->_caption, URL::site($this->_action));
-        Helper_Locator::add($this->_month->getFullName().' '.$this->_year,
-            URL::site($this->_action.'/'.$this->_month->getUrlName().'-'.$this->_year));
+        Helper_Locator::add($this->_month->getFullName().' '.$this->_month->getYear(),
+            URL::site($this->_action.'/'.$this->_month->getUrlName().'-'.$this->_month->getYear()));
 
         $navigation = new Component_CalendarNavigation(
             $this->_month,
-            $this->_year,
             $this->_entity,
             $this->_action
         );
@@ -147,7 +145,7 @@ class Friend_Calendar_Core extends Friend_Abstract_Entity
      */
     public function getEventsBox()
     {
-        return new Box_Big(new Component_List($this->_events), $this->_getBoxCaption());
+        return new Box_Biggest(new Component_Calendar($this->_month, $this->_events), $this->_getBoxCaption());
     }
 
     /**
